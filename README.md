@@ -48,7 +48,7 @@ uvicorn app.main:app --reload
 
 ---
 ## 🌐 Live Demo
-http://34.19.154.5
+https://vibemap.ca
 
 ## API Endpoints
 
