@@ -11,9 +11,9 @@ env:
   REGION: northamerica-northeast1
   REPOSITORY: neighborhood-vibe
   CLUSTER_NAME: neighborhood-vibe-cluster
-  CLUSTER_PROJECT: neighborhood-vibe-project   
   BACKEND_IMAGE: backend
   FRONTEND_IMAGE: frontend
+
 jobs:
   deploy:
     name: Deploy to GKE
@@ -37,7 +37,7 @@ jobs:
         with:
           cluster_name: ${{ env.CLUSTER_NAME }}
           location: ${{ env.REGION }}
-	  project_id: neighborhood-vibe-project 
+          project_id: neighborhood-vibe-project
 
       - name: Set image tags in K8s manifests
         run: |
