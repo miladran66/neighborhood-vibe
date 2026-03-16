@@ -39,6 +39,15 @@ def validate_address(address: str) -> str:
 
 
 @router.get("/api/neighborhood")
+@router.get("/api/housing-debug")
+async def housing_debug():
+    from app.services.toronto_data import _load_housing_data, _housing_cache, _housing_loaded
+    await _load_housing_data()
+    return {
+        "loaded": _housing_loaded,
+        "neighbourhoods_count": len(_housing_cache),
+        "sample_keys": list(_housing_cache.keys())[:5],
+    }
 @limiter.limit("10/minute")
 async def get_neighborhood(request: Request, address: str):
     address = validate_address(address)
