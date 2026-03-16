@@ -20,7 +20,7 @@ async def _load_housing_data():
     client = await get_client()
     try:
         # مستقیم CSV رو دانلود کن
-        csv_url = "https://ckan0.cf.opendata.inter.prod-toronto.ca/datastore/dump/f07fe8f0-fa24-4d68-8cb4-326e280b0b05"
+        csv_url = "https://ckan0.cf.opendata.inter.prod-toronto.ca/dataset/6e19a90f-971c-46b3-852c-0c48c436d1fc/resource/f07fe8f0-fa24-4d68-8cb4-326e280b0b05/download/neighbourhood-profiles-2016-140-model.csv"
         csv_resp = await client.get(csv_url, timeout=30.0)
         
         if csv_resp.status_code != 200:
