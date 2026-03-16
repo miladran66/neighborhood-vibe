@@ -3,8 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Vibe Check — Toronto Neighborhood Explorer</title>
+<title>VibeMap — Toronto Neighborhood Explorer</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Sans:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+<script src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_KEY"></script>
 <style>
   :root {
     --bg: #0a0a0f;
@@ -27,7 +28,6 @@
     overflow-x: hidden;
   }
 
-  /* Background grid */
   body::before {
     content: '';
     position: fixed;
@@ -48,7 +48,6 @@
     z-index: 1;
   }
 
-  /* Header */
   header {
     padding: 48px 0 32px;
     display: flex;
@@ -77,9 +76,7 @@
     letter-spacing: -0.03em;
   }
 
-  h1 span {
-    color: var(--accent);
-  }
+  h1 span { color: var(--accent); }
 
   .subtitle {
     color: var(--muted);
@@ -88,14 +85,10 @@
     font-weight: 300;
   }
 
-  /* Search */
-  .search-section {
-    margin: 16px 0 48px;
-  }
+  .search-section { margin: 16px 0 48px; }
 
   .search-box {
     display: flex;
-    gap: 0;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 14px;
@@ -103,9 +96,7 @@
     transition: border-color 0.2s;
   }
 
-  .search-box:focus-within {
-    border-color: var(--accent);
-  }
+  .search-box:focus-within { border-color: var(--accent); }
 
   .search-icon {
     display: flex;
@@ -167,7 +158,6 @@
     color: var(--accent);
   }
 
-  /* Results */
   #results { display: none; animation: fadeUp 0.5s ease forwards; }
 
   @keyframes fadeUp {
@@ -175,7 +165,6 @@
     to { opacity: 1; transform: translateY(0); }
   }
 
-  /* Vibe Score Hero */
   .vibe-hero {
     background: var(--card);
     border: 1px solid var(--border);
@@ -238,6 +227,8 @@
     font-family: 'DM Sans', sans-serif;
   }
 
+  .vibe-info { flex: 1; }
+
   .vibe-info h2 {
     font-family: 'Syne', sans-serif;
     font-size: 1.4rem;
@@ -263,7 +254,33 @@
     border-left: 2px solid var(--border);
   }
 
-  /* Score cards */
+  /* Share button */
+  .share-btn {
+    margin-top: 16px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.82rem;
+    padding: 8px 16px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .share-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .share-btn.copied {
+    border-color: var(--accent2);
+    color: var(--accent2);
+  }
+
   .scores-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -300,10 +317,7 @@
     margin-top: 4px;
   }
 
-  /* Places */
-  .places-section {
-    margin-bottom: 40px;
-  }
+  .places-section { margin-bottom: 40px; }
 
   .section-title {
     font-family: 'Syne', sans-serif;
@@ -364,7 +378,39 @@
     margin-top: 2px;
   }
 
-  /* Loading */
+  /* Map */
+  .map-section { margin-bottom: 40px; }
+
+  #map {
+    width: 100%;
+    height: 400px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  /* Map legend */
+  .map-legend {
+    display: flex;
+    gap: 16px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    color: var(--muted);
+  }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+  }
+
   #loading {
     display: none;
     text-align: center;
@@ -388,7 +434,6 @@
     font-size: 0.9rem;
   }
 
-  /* Error */
   #error {
     display: none;
     background: rgba(255,80,80,0.1);
@@ -400,7 +445,6 @@
     font-size: 0.9rem;
   }
 
-  /* Footer */
   footer {
     padding: 32px 0;
     color: var(--muted);
@@ -411,16 +455,11 @@
     align-items: center;
   }
 
-  .api-note {
-    color: var(--muted);
-    font-size: 0.75rem;
-    margin-top: 10px;
-  }
-
   @media (max-width: 640px) {
     .vibe-hero { flex-direction: column; gap: 20px; }
     .scores-grid { grid-template-columns: repeat(3, 1fr); gap: 10px; }
     .score-card .val { font-size: 1.5rem; }
+    #map { height: 280px; }
   }
 </style>
 </head>
@@ -473,6 +512,9 @@
         <div class="address-label">📍 Neighborhood</div>
         <h2 id="formattedAddress">--</h2>
         <p class="ai-summary" id="aiSummary">--</p>
+        <button class="share-btn" id="shareBtn" onclick="shareResult()">
+          🔗 Share this vibe
+        </button>
       </div>
     </div>
 
@@ -492,6 +534,30 @@
         <div class="icon">🚲</div>
         <div class="val" id="bikeScore">--</div>
         <div class="desc">Bike Score</div>
+      </div>
+    </div>
+
+    <!-- Interactive Map -->
+    <div class="map-section">
+      <div class="section-title">🗺️ Neighborhood Map</div>
+      <div id="map"></div>
+      <div class="map-legend">
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#c8f542"></div>
+          <span>Your location</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#ff6b6b"></div>
+          <span>Restaurants</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#42f5a7"></div>
+          <span>Schools</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#6b9fff"></div>
+          <span>Transit</span>
+        </div>
       </div>
     </div>
 
@@ -521,6 +587,20 @@
 <script>
   const API_BASE = '';
 
+  let map = null;
+  let markers = [];
+  let currentAddress = '';
+
+  // Load address from URL on page load
+  window.addEventListener('load', () => {
+    const params = new URLSearchParams(window.location.search);
+    const addr = params.get('address');
+    if (addr) {
+      document.getElementById('addressInput').value = addr;
+      checkVibe();
+    }
+  });
+
   function setAddress(addr) {
     document.getElementById('addressInput').value = addr;
     checkVibe();
@@ -534,7 +614,7 @@
     const address = document.getElementById('addressInput').value.trim();
     if (!address) return;
 
-    // Show loading
+    currentAddress = address;
     document.getElementById('results').style.display = 'none';
     document.getElementById('error').style.display = 'none';
     document.getElementById('loading').style.display = 'block';
@@ -553,7 +633,6 @@
   }
 
   function renderResults(data) {
-    // Vibe score ring animation
     const score = data.vibe_score || 50;
     document.getElementById('vibeScore').textContent = score;
     document.getElementById('formattedAddress').textContent = data.formatted_address || data.address;
@@ -565,7 +644,6 @@
       document.getElementById('scoreRing').style.strokeDashoffset = offset;
     }, 100);
 
-    // Transit scores
     const t = data.transit || {};
     document.getElementById('walkScore').textContent = t.walk_score ?? '--';
     document.getElementById('walkDesc').textContent = t.walk_description || 'Walk Score';
@@ -573,7 +651,6 @@
     document.getElementById('transitDesc').textContent = t.transit_description || 'Transit Score';
     document.getElementById('bikeScore').textContent = t.bike_score ?? '--';
 
-    // Places
     const places = data.nearby_places || [];
     const restaurants = places.filter(p => p.type === 'restaurant');
     const schools = places.filter(p => p.type === 'school');
@@ -582,6 +659,11 @@
     renderPlaces('restaurantsList', restaurants, '🍽️');
     renderPlaces('schoolsList', schools, '🏫');
     renderPlaces('transitList', transit, '🚇');
+
+    // Map
+    if (data.lat && data.lng) {
+      initMap(data.lat, data.lng, places);
+    }
 
     document.getElementById('results').style.display = 'block';
   }
@@ -599,6 +681,116 @@
         <div class="place-type">${p.vicinity || ''}</div>
       </div>
     `).join('');
+  }
+
+  function initMap(lat, lng, places) {
+    const center = { lat, lng };
+    const darkStyle = [
+      { elementType: "geometry", stylers: [{ color: "#13131a" }] },
+      { elementType: "labels.text.stroke", stylers: [{ color: "#13131a" }] },
+      { elementType: "labels.text.fill", stylers: [{ color: "#6b6b80" }] },
+      { featureType: "road", elementType: "geometry", stylers: [{ color: "#1e1e2e" }] },
+      { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#0a0a0f" }] },
+      { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
+      { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#2c2c3e" }] },
+      { featureType: "water", elementType: "geometry", stylers: [{ color: "#0a0a0f" }] },
+      { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#3d3d4e" }] },
+      { featureType: "poi", elementType: "geometry", stylers: [{ color: "#16161f" }] },
+      { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#0d1a0d" }] },
+      { featureType: "transit", elementType: "geometry", stylers: [{ color: "#16161f" }] },
+    ];
+
+    if (!map) {
+      map = new google.maps.Map(document.getElementById('map'), {
+        zoom: 15,
+        center,
+        styles: darkStyle,
+        disableDefaultUI: false,
+        zoomControl: true,
+        mapTypeControl: false,
+        streetViewControl: false,
+        fullscreenControl: true,
+      });
+    } else {
+      map.setCenter(center);
+      map.setZoom(15);
+    }
+
+    // Clear old markers
+    markers.forEach(m => m.setMap(null));
+    markers = [];
+
+    // Main marker (your location)
+    const mainMarker = new google.maps.Marker({
+      position: center,
+      map,
+      title: "Your Location",
+      zIndex: 999,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 12,
+        fillColor: "#c8f542",
+        fillOpacity: 1,
+        strokeColor: "#0a0a0f",
+        strokeWeight: 3,
+      }
+    });
+    markers.push(mainMarker);
+
+    // Place markers
+    const iconColors = {
+      restaurant: "#ff6b6b",
+      school: "#42f5a7",
+      subway_station: "#6b9fff",
+    };
+
+    const infoWindow = new google.maps.InfoWindow();
+
+    places.forEach(place => {
+      if (!place.lat || !place.lng) return;
+      const color = iconColors[place.type] || "#ffffff";
+
+      const marker = new google.maps.Marker({
+        position: { lat: place.lat, lng: place.lng },
+        map,
+        title: place.name,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: color,
+          fillOpacity: 0.9,
+          strokeColor: "#0a0a0f",
+          strokeWeight: 1.5,
+        }
+      });
+
+      marker.addListener('click', () => {
+        infoWindow.setContent(`
+          <div style="background:#16161f; color:#e8e8f0; padding:10px; border-radius:8px; font-family:'DM Sans',sans-serif;">
+            <strong>${place.name}</strong><br>
+            ${place.rating ? `⭐ ${place.rating}<br>` : ''}
+            <small style="color:#6b6b80">${place.vicinity || ''}</small>
+          </div>
+        `);
+        infoWindow.open(map, marker);
+      });
+
+      markers.push(marker);
+    });
+  }
+
+  function shareResult() {
+    const url = new URL(window.location.href);
+    url.searchParams.set('address', currentAddress);
+    navigator.clipboard.writeText(url.toString()).then(() => {
+      const btn = document.getElementById('shareBtn');
+      btn.textContent = '✅ Link copied!';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.textContent = '🔗 Share this vibe';
+        btn.classList.remove('copied');
+      }, 2000);
+    });
   }
 </script>
 </body>
