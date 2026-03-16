@@ -13,45 +13,28 @@ _housing_loaded = False
 
 
 async def _load_housing_data():
-    """یه بار CSV رو دانلود و parse کن"""
     global _housing_cache, _housing_loaded
     if _housing_loaded:
         return
 
     client = await get_client()
     try:
-        # پیدا کردن URL فایل CSV
-        resp = await client.get(
-            f"{TORONTO_API}/api/3/action/package_show",
-            params={"id": "neighbourhood-profiles"},
-            timeout=15.0
-        )
-        package = resp.json()
-        resources = package.get("result", {}).get("resources", [])
-
-        csv_url = None
-        for r in resources:
-            if "2016" in r.get("name", "") and r.get("format", "").upper() == "CSV":
-                csv_url = r.get("url")
-                break
-
-        if not csv_url:
-            print("Housing CSV not found")
+        # مستقیم CSV رو دانلود کن
+        csv_url = "https://ckan0.cf.opendata.inter.prod-toronto.ca/datastore/dump/f07fe8f0-fa24-4d68-8cb4-326e280b0b05"
+        csv_resp = await client.get(csv_url, timeout=30.0)
+        
+        if csv_resp.status_code != 200:
+            print(f"Housing CSV download failed: {csv_resp.status_code}")
             return
 
-        # دانلود CSV
-        csv_resp = await client.get(csv_url, timeout=30.0)
         content = csv_resp.text
-
-        # Parse CSV
         reader = csv.DictReader(io.StringIO(content))
+        
         for row in reader:
-            category = row.get("Category", "")
             topic = row.get("Topic", "")
-            # پیدا کردن ردیف‌های مربوط به shelter cost
-            if "shelter" in topic.lower() or "shelter" in category.lower():
+            if "shelter" in topic.lower():
                 for key, value in row.items():
-                    if key not in ("Category", "Topic", "Data Source", "City of Toronto"):
+                    if key not in ("_id", "Category", "Topic", "Data Source", "City of Toronto"):
                         if key not in _housing_cache:
                             _housing_cache[key] = {}
                         _housing_cache[key][topic] = value
@@ -61,7 +44,6 @@ async def _load_housing_data():
 
     except Exception as e:
         print(f"Failed to load housing data: {e}")
-
 
 async def get_neighbourhood_name(lat: float, lng: float) -> str:
     """Get Toronto neighbourhood name from lat/lng"""
