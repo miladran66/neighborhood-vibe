@@ -1,11 +1,26 @@
 import httpx
+import asyncio
 from app.config import settings
 
 BASE_URL = "https://maps.googleapis.com/maps/api"
+TIMEOUT = httpx.Timeout(10.0, connect=5.0)
+
+# Connection pool - shared across requests
+_client: httpx.AsyncClient | None = None
+
+async def get_client() -> httpx.AsyncClient:
+    global _client
+    if _client is None or _client.is_closed:
+        _client = httpx.AsyncClient(timeout=TIMEOUT, limits=httpx.Limits(
+            max_connections=20,
+            max_keepalive_connections=10
+        ))
+    return _client
+
 
 async def geocode_address(address: str) -> dict:
-    """Convert address to lat/lng + formatted address"""
-    async with httpx.AsyncClient() as client:
+    client = await get_client()
+    try:
         resp = await client.get(
             f"{BASE_URL}/geocode/json",
             params={"address": address, "key": settings.GOOGLE_MAPS_API_KEY}
@@ -19,11 +34,14 @@ async def geocode_address(address: str) -> dict:
                 "lat": loc["lat"],
                 "lng": loc["lng"]
             }
-        return {}
+    except httpx.TimeoutException:
+        raise Exception("Google Maps API timeout")
+    return {}
+
 
 async def get_nearby_places(lat: float, lng: float, place_type: str, radius: int = 500) -> list:
-    """Get nearby places by type (restaurant, school, subway_station, etc.)"""
-    async with httpx.AsyncClient() as client:
+    client = await get_client()
+    try:
         resp = await client.get(
             f"{BASE_URL}/place/nearbysearch/json",
             params={
@@ -43,3 +61,5 @@ async def get_nearby_places(lat: float, lng: float, place_type: str, radius: int
                 "type": place_type
             })
         return places
+    except httpx.TimeoutException:
+        return []

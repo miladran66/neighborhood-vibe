@@ -6,9 +6,22 @@ from app.services.walkscore import get_walk_score
 from app.services.ai_summary import generate_neighborhood_summary
 import asyncio
 import re
+import json
+import redis.asyncio as aioredis
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
+
+# Redis client
+_redis: aioredis.Redis | None = None
+
+async def get_redis() -> aioredis.Redis:
+    global _redis
+    if _redis is None:
+        _redis = aioredis.from_url("redis://redis-service:6379", decode_responses=True)
+    return _redis
+
+CACHE_TTL = 60 * 60 * 24  # 24 ساعت
 
 
 def validate_address(address: str) -> str:
@@ -27,6 +40,16 @@ def validate_address(address: str) -> str:
 @limiter.limit("10/minute")
 async def get_neighborhood(request: Request, address: str):
     address = validate_address(address)
+    cache_key = f"vibe:{address.lower()}"
+
+    # Check cache
+    try:
+        r = await get_redis()
+        cached = await r.get(cache_key)
+        if cached:
+            return json.loads(cached)
+    except Exception:
+        pass  # اگه Redis نبود، ادامه بده
 
     # Geocode
     location = await geocode_address(address)
@@ -35,16 +58,16 @@ async def get_neighborhood(request: Request, address: str):
 
     lat, lng = location["lat"], location["lng"]
 
-    # Get nearby places for multiple types in parallel
-    restaurants, schools, transit = await asyncio.gather(
-        get_nearby_places(lat, lng, "restaurant"),
-        get_nearby_places(lat, lng, "school"),
-        get_nearby_places(lat, lng, "subway_station"),
+    # Get nearby places + scores در parallel
+    (restaurants, schools, transit), scores = await asyncio.gather(
+        asyncio.gather(
+            get_nearby_places(lat, lng, "restaurant"),
+            get_nearby_places(lat, lng, "school"),
+            get_nearby_places(lat, lng, "subway_station"),
+        ),
+        get_walk_score(address, lat, lng)
     )
     places = restaurants + schools + transit
-
-    # Calculate scores
-    scores = await get_walk_score(address, lat, lng)
 
     # AI summary
     summary, vibe_score = await generate_neighborhood_summary({
@@ -59,7 +82,7 @@ async def get_neighborhood(request: Request, address: str):
         "transit_count": len(transit),
     })
 
-    return {
+    result = {
         "formatted_address": location["formatted_address"],
         "lat": lat,
         "lng": lng,
@@ -74,3 +97,12 @@ async def get_neighborhood(request: Request, address: str):
         "vibe_score": vibe_score,
         "ai_summary": summary,
     }
+
+    # Save to cache
+    try:
+        r = await get_redis()
+        await r.setex(cache_key, CACHE_TTL, json.dumps(result))
+    except Exception:
+        pass
+
+    return result
