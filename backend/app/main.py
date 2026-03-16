@@ -19,6 +19,8 @@ app.add_middleware(
     allow_origins=[
         "https://vibemap.ca",
         "https://www.vibemap.ca",
+        "http://vibemap.ca",
+        "http://www.vibemap.ca",
     ],
     allow_credentials=False,
     allow_methods=["GET"],
