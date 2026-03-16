@@ -4,6 +4,7 @@ from slowapi.util import get_remote_address
 from app.services.maps import geocode_address, get_nearby_places
 from app.services.walkscore import get_walk_score
 from app.services.ai_summary import generate_neighborhood_summary
+from app.services.toronto_data import get_crime_data, get_housing_data, get_neighbourhood_name
 import asyncio
 import re
 import json
@@ -14,6 +15,7 @@ limiter = Limiter(key_func=get_remote_address)
 
 # Redis client
 _redis: aioredis.Redis | None = None
+
 
 async def get_redis() -> aioredis.Redis:
     global _redis
@@ -49,7 +51,7 @@ async def get_neighborhood(request: Request, address: str):
         if cached:
             return json.loads(cached)
     except Exception:
-        pass  # اگه Redis نبود، ادامه بده
+        pass
 
     # Geocode
     location = await geocode_address(address)
@@ -58,16 +60,21 @@ async def get_neighborhood(request: Request, address: str):
 
     lat, lng = location["lat"], location["lng"]
 
-    # Get nearby places + scores در parallel
-    (restaurants, schools, transit), scores = await asyncio.gather(
+    # Run all data fetches in parallel
+    (restaurants, schools, transit), scores, neighbourhood_name, crime_data = await asyncio.gather(
         asyncio.gather(
             get_nearby_places(lat, lng, "restaurant"),
             get_nearby_places(lat, lng, "school"),
             get_nearby_places(lat, lng, "subway_station"),
         ),
-        get_walk_score(address, lat, lng)
+        get_walk_score(address, lat, lng),
+        get_neighbourhood_name(lat, lng),
+        get_crime_data(lat, lng),
     )
     places = restaurants + schools + transit
+
+    # Housing data (needs neighbourhood name first)
+    housing_data = await get_housing_data(neighbourhood_name) if neighbourhood_name else {}
 
     # AI summary
     summary, vibe_score = await generate_neighborhood_summary({
@@ -80,6 +87,8 @@ async def get_neighborhood(request: Request, address: str):
         "restaurants_count": len(restaurants),
         "schools_count": len(schools),
         "transit_count": len(transit),
+        "safety_score": crime_data.get("safety_score"),
+        "total_incidents": crime_data.get("total_incidents"),
     })
 
     result = {
@@ -96,6 +105,8 @@ async def get_neighborhood(request: Request, address: str):
         "nearby_places": places,
         "vibe_score": vibe_score,
         "ai_summary": summary,
+        "crime": crime_data,
+        "housing": housing_data,
     }
 
     # Save to cache
