@@ -4,6 +4,7 @@ from slowapi.util import get_remote_address
 from app.services.maps import geocode_address, get_nearby_places
 from app.services.walkscore import get_walk_score
 from app.services.ai_summary import generate_neighborhood_summary
+import asyncio
 import re
 
 router = APIRouter()
@@ -32,16 +33,18 @@ async def get_neighborhood(request: Request, address: str):
     if not location:
         raise HTTPException(status_code=404, detail="Address not found")
 
-    # Get nearby places
-    places = await get_nearby_places(location["lat"], location["lng"])
+    lat, lng = location["lat"], location["lng"]
+
+    # Get nearby places for multiple types in parallel
+    restaurants, schools, transit = await asyncio.gather(
+        get_nearby_places(lat, lng, "restaurant"),
+        get_nearby_places(lat, lng, "school"),
+        get_nearby_places(lat, lng, "subway_station"),
+    )
+    places = restaurants + schools + transit
 
     # Calculate scores
-    scores = await get_walk_score(address, location["lat"], location["lng"])
-
-    # Count places by type
-    restaurants = [p for p in places if p.get("type") == "restaurant"]
-    schools = [p for p in places if p.get("type") == "school"]
-    transit = [p for p in places if p.get("type") == "subway_station"]
+    scores = await get_walk_score(address, lat, lng)
 
     # AI summary
     summary, vibe_score = await generate_neighborhood_summary({
@@ -58,8 +61,8 @@ async def get_neighborhood(request: Request, address: str):
 
     return {
         "formatted_address": location["formatted_address"],
-        "lat": location["lat"],
-        "lng": location["lng"],
+        "lat": lat,
+        "lng": lng,
         "transit": {
             "walk_score": scores["walk_score"],
             "walk_description": scores["walk_description"],
