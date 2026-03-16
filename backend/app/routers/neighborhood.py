@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request, HTTPException
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 from app.services.maps import geocode_address, get_nearby_places
-from app.services.walkscore import calculate_scores
+from app.services.walkscore import get_walk_score
 from app.services.ai_summary import get_ai_summary
 import re
 
@@ -39,7 +39,7 @@ async def get_neighborhood(request: Request, address: str):
     places = await get_nearby_places(location["lat"], location["lng"])
 
     # Calculate scores
-    scores = calculate_scores(places)
+    scores = await get_walk_score(address, location["lat"], location["lng"])
 
     # AI summary
     ai_data = await get_ai_summary(
