@@ -1,14 +1,70 @@
 import httpx
+import csv
+import io
 from app.services.maps import get_client
+from app.config import settings
 
-# Toronto Open Data API
-TORONTO_API = "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action"
+# Toronto Open Data
+TORONTO_API = "https://ckan0.cf.opendata.inter.prod-toronto.ca"
 
-# Neighbourhood shape data (to map lat/lng to neighbourhood name)
-NEIGHBOURHOODS_URL = "https://ckan0.cf.opendata.inter.prod-toronto.ca/api/3/action/datastore_search"
+# Cache برای housing data
+_housing_cache: dict = {}
+_housing_loaded = False
+
+
+async def _load_housing_data():
+    """یه بار CSV رو دانلود و parse کن"""
+    global _housing_cache, _housing_loaded
+    if _housing_loaded:
+        return
+
+    client = await get_client()
+    try:
+        # پیدا کردن URL فایل CSV
+        resp = await client.get(
+            f"{TORONTO_API}/api/3/action/package_show",
+            params={"id": "neighbourhood-profiles"},
+            timeout=15.0
+        )
+        package = resp.json()
+        resources = package.get("result", {}).get("resources", [])
+
+        csv_url = None
+        for r in resources:
+            if "2016" in r.get("name", "") and r.get("format", "").upper() == "CSV":
+                csv_url = r.get("url")
+                break
+
+        if not csv_url:
+            print("Housing CSV not found")
+            return
+
+        # دانلود CSV
+        csv_resp = await client.get(csv_url, timeout=30.0)
+        content = csv_resp.text
+
+        # Parse CSV
+        reader = csv.DictReader(io.StringIO(content))
+        for row in reader:
+            category = row.get("Category", "")
+            topic = row.get("Topic", "")
+            # پیدا کردن ردیف‌های مربوط به shelter cost
+            if "shelter" in topic.lower() or "shelter" in category.lower():
+                for key, value in row.items():
+                    if key not in ("Category", "Topic", "Data Source", "City of Toronto"):
+                        if key not in _housing_cache:
+                            _housing_cache[key] = {}
+                        _housing_cache[key][topic] = value
+
+        _housing_loaded = True
+        print(f"Housing data loaded for {len(_housing_cache)} neighbourhoods")
+
+    except Exception as e:
+        print(f"Failed to load housing data: {e}")
+
 
 async def get_neighbourhood_name(lat: float, lng: float) -> str:
-    """Get Toronto neighbourhood name from lat/lng using reverse geocoding"""
+    """Get Toronto neighbourhood name from lat/lng"""
     client = await get_client()
     try:
         resp = await client.get(
@@ -16,7 +72,7 @@ async def get_neighbourhood_name(lat: float, lng: float) -> str:
             params={
                 "latlng": f"{lat},{lng}",
                 "result_type": "neighborhood|sublocality",
-                "key": __import__('app.config', fromlist=['settings']).settings.GOOGLE_MAPS_API_KEY
+                "key": settings.GOOGLE_MAPS_API_KEY
             }
         )
         data = resp.json()
@@ -33,7 +89,6 @@ async def get_crime_data(lat: float, lng: float) -> dict:
     """Get crime statistics near a location from Toronto Police Open Data"""
     client = await get_client()
     try:
-        # Major Crime Indicators dataset
         resp = await client.get(
             "https://services.arcgis.com/S9th0jAJ7bqgIRjw/arcgis/rest/services/Major_Crime_Indicators_Open_Data/FeatureServer/0/query",
             params={
@@ -48,12 +103,12 @@ async def get_crime_data(lat: float, lng: float) -> dict:
                 "returnCountOnly": "false",
                 "f": "json",
                 "resultRecordCount": 100,
-            }
+            },
+            timeout=10.0
         )
         data = resp.json()
         features = data.get("features", [])
 
-        # Count by category
         categories = {}
         for f in features:
             cat = f.get("attributes", {}).get("MCI_CATEGORY", "Other")
@@ -61,7 +116,6 @@ async def get_crime_data(lat: float, lng: float) -> dict:
 
         total = len(features)
 
-        # Safety score: fewer crimes = higher score
         if total == 0:
             safety_score = 95
         elif total < 5:
@@ -88,35 +142,29 @@ async def get_crime_data(lat: float, lng: float) -> dict:
 
 
 async def get_housing_data(neighbourhood: str) -> dict:
-    """Get average housing/rent data for a Toronto neighbourhood"""
-    client = await get_client()
-    try:
-        # Toronto Neighbourhood Profiles dataset
-        resp = await client.get(
-            f"{TORONTO_API}/datastore_search",
-            params={
-                "resource_id": "6e19a90f-971c-46b3-852c-0c48c436d1fc",
-                "q": neighbourhood,
-                "limit": 5,
-            }
-        )
-        data = resp.json()
-        records = data.get("result", {}).get("records", [])
+    """Get housing data for a neighbourhood"""
+    await _load_housing_data()
 
-        if records:
-            record = records[0]
-            return {
-                "neighbourhood": record.get("Neighbourhood", neighbourhood),
-                "avg_household_income": record.get("Average household total income ($)", "N/A"),
-                "avg_shelter_cost_owner": record.get("Average monthly shelter costs for owned dwellings ($)", "N/A"),
-                "avg_shelter_cost_renter": record.get("Average monthly shelter costs for rented dwellings ($)", "N/A"),
-            }
-    except Exception as e:
-        print(f"Housing data error: {e}")
+    # fuzzy match neighbourhood name
+    match = None
+    neighbourhood_lower = neighbourhood.lower()
+    for key in _housing_cache:
+        if neighbourhood_lower in key.lower() or key.lower() in neighbourhood_lower:
+            match = key
+            break
+
+    if match and _housing_cache[match]:
+        data = _housing_cache[match]
+        renter_cost = next((v for k, v in data.items() if "rented" in k.lower()), "N/A")
+        owner_cost = next((v for k, v in data.items() if "owned" in k.lower()), "N/A")
+        return {
+            "neighbourhood": match,
+            "avg_shelter_cost_renter": renter_cost,
+            "avg_shelter_cost_owner": owner_cost,
+        }
 
     return {
         "neighbourhood": neighbourhood,
-        "avg_household_income": "N/A",
-        "avg_shelter_cost_owner": "N/A",
         "avg_shelter_cost_renter": "N/A",
+        "avg_shelter_cost_owner": "N/A",
     }
