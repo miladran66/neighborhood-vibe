@@ -13,6 +13,7 @@ env:
   CLUSTER_NAME: neighborhood-vibe-cluster
   BACKEND_IMAGE: backend
   FRONTEND_IMAGE: frontend
+  NEXTJS_IMAGE: frontend-next
 
 jobs:
   deploy:
@@ -44,8 +45,10 @@ jobs:
           IMAGE_TAG=${{ github.event.workflow_run.head_sha }}
           BACKEND_FULL=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.BACKEND_IMAGE }}:${IMAGE_TAG}
           FRONTEND_FULL=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.FRONTEND_IMAGE }}:${IMAGE_TAG}
+          NEXTJS_FULL=${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.NEXTJS_IMAGE }}:${IMAGE_TAG}
           sed -i "s|IMAGE_BACKEND_PLACEHOLDER|${BACKEND_FULL}|g" infra/k8s/backend.yml
           sed -i "s|IMAGE_FRONTEND_PLACEHOLDER|${FRONTEND_FULL}|g" infra/k8s/frontend.yml
+          sed -i "s|IMAGE_FRONTEND_NEXT_PLACEHOLDER|${NEXTJS_FULL}|g" infra/k8s/frontend-next.yml
 
       - name: Apply Kubernetes secrets
         run: |
@@ -60,8 +63,8 @@ jobs:
       - name: Wait for rollout
         run: |
           kubectl rollout status deployment/backend --timeout=120s
-          kubectl rollout status deployment/frontend --timeout=120s
+          kubectl rollout status deployment/frontend-next --timeout=120s
 
       - name: Get external IP
         run: |
-          kubectl get service frontend-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+          kubectl get service frontend-next-service -o jsonpath='{.status.loadBalancer.ingress[0].ip}'

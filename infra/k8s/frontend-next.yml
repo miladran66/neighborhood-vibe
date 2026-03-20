@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-next
+  labels:
+    app: frontend-next
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend-next
+  template:
+    metadata:
+      labels:
+        app: frontend-next
+    spec:
+      containers:
+        - name: frontend-next
+          image: IMAGE_FRONTEND_NEXT_PLACEHOLDER
+          ports:
+            - containerPort: 3000
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-next-service
+spec:
+  selector:
+    app: frontend-next
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
+  type: ClusterIP

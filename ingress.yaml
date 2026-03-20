@@ -27,9 +27,9 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: frontend-service
+                name: frontend-next-service
                 port:
-                  number: 80
+                  number: 3000
     - host: www.vibemap.ca
       http:
         paths:
@@ -44,6 +44,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: frontend-service
+                name: frontend-next-service
                 port:
-                  number: 80
+                  number: 3000
