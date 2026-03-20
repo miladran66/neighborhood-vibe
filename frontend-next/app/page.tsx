@@ -17,22 +17,33 @@ const NEIGHBOURHOODS = [
   { name: 'Danforth', slug: 'danforth', emoji: '🍋', tag: 'Greek Town' },
 ]
 
+const ONTARIO_CITIES = [
+  { name: 'Ottawa', slug: 'ottawa', emoji: '🏛️' },
+  { name: 'Mississauga', slug: 'mississauga', emoji: '🏢' },
+  { name: 'Hamilton', slug: 'hamilton', emoji: '⚙️' },
+  { name: 'London', slug: 'london', emoji: '🎓' },
+  { name: 'Brampton', slug: 'brampton', emoji: '🌸' },
+  { name: 'Kitchener', slug: 'kitchener', emoji: '🚀' },
+  { name: 'Windsor', slug: 'windsor', emoji: '🎷' },
+  { name: 'Barrie', slug: 'barrie', emoji: '⛷️' },
+  { name: 'Kingston', slug: 'kingston', emoji: '🏰' },
+  { name: 'Guelph', slug: 'guelph', emoji: '🌱' },
+]
+
 export default function Home() {
   const [address, setAddress] = useState('')
 
   const handleSearch = () => {
     if (!address.trim()) return
-    window.location.href = `/?address=${encodeURIComponent(address)}`
+    window.location.href = `/result?address=${encodeURIComponent(address)}`
   }
 
   return (
     <main className="min-h-screen relative">
-      {/* Orbs */}
       <div className="orb orb-1" />
       <div className="orb orb-2" />
       <div className="orb orb-3" />
 
-      {/* Noise texture overlay */}
       <div className="fixed inset-0 opacity-[0.03] pointer-events-none z-0"
         style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 256 256\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noise\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.9\' numOctaves=\'4\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noise)\'/%3E%3C/svg%3E")' }} />
 
@@ -42,13 +53,13 @@ export default function Home() {
         <header className="text-center mb-16 animate-fadeUp">
           <div className="inline-flex items-center gap-2 glass rounded-full px-4 py-2 text-xs text-[var(--muted)] mb-8 font-display tracking-widest uppercase">
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
-            Toronto Neighbourhood Intelligence
+            Ontario Neighbourhood Intelligence
           </div>
           <h1 className="font-display font-black text-6xl md:text-8xl tracking-tight mb-4 leading-none">
             Vibe<span className="text-[var(--accent)]">Map</span>
           </h1>
           <p className="text-[var(--muted)] text-lg md:text-xl max-w-lg mx-auto leading-relaxed" style={{ fontFamily: 'var(--font-body)' }}>
-            AI-powered neighbourhood intelligence for Toronto
+            AI-powered neighbourhood intelligence for Ontario
           </p>
         </header>
 
@@ -61,7 +72,7 @@ export default function Home() {
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              placeholder="Enter any Toronto address..."
+              placeholder="Enter any Ontario address..."
               className="flex-1 bg-transparent outline-none text-[var(--text)] py-4 px-2 placeholder-[var(--muted)] text-base"
               style={{ fontFamily: 'var(--font-body)' }}
             />
@@ -73,13 +84,12 @@ export default function Home() {
             </button>
           </div>
 
-          {/* Quick tags */}
           <div className="flex gap-2 mt-4 flex-wrap justify-center">
             {['King West', 'Distillery', 'Queen West', 'Midtown'].map((n) => (
               <button
                 key={n}
                 onClick={() => setAddress(n + ', Toronto')}
-                className="glass rounded-full px-4 py-1.5 text-xs text-[var(--muted)] hover:text-[var(--accent)] hover:border-[var(--accent)] transition-all"
+                className="glass rounded-full px-4 py-1.5 text-xs text-[var(--muted)] hover:text-[var(--accent)] transition-all"
                 style={{ fontFamily: 'var(--font-body)' }}
               >
                 {n}
@@ -88,11 +98,11 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Neighbourhoods Grid */}
+        {/* Toronto Neighbourhoods */}
         <section>
           <div className="flex items-center gap-4 mb-8">
             <h2 className="font-display text-xs tracking-widest text-[var(--muted)] uppercase">
-              Explore Neighbourhoods
+              Toronto Neighbourhoods
             </h2>
             <div className="flex-1 h-px bg-white/5" />
           </div>
@@ -118,12 +128,37 @@ export default function Home() {
           </div>
         </section>
 
+        {/* Ontario Cities */}
+        <section className="mt-14">
+          <div className="flex items-center gap-4 mb-8">
+            <h2 className="font-display text-xs tracking-widest text-[var(--muted)] uppercase">
+              Ontario Cities
+            </h2>
+            <div className="flex-1 h-px bg-white/5" />
+          </div>
+
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+            {ONTARIO_CITIES.map((c) => (
+              <Link
+                key={c.slug}
+                href={`/city/${c.slug}`}
+                className="glass rounded-xl p-3 text-center hover:border-[rgba(200,245,66,0.4)] transition-all group hover:-translate-y-0.5"
+              >
+                <div className="text-2xl mb-1">{c.emoji}</div>
+                <div className="text-xs font-bold text-[rgba(255,255,255,0.6)] group-hover:text-[var(--accent)] transition-colors" style={{ fontFamily: 'var(--font-display)' }}>
+                  {c.name}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+
         {/* Stats bar */}
-        <div className="mt-20 glass rounded-2xl p-6 grid grid-cols-3 gap-6 text-center stagger">
+        <div className="mt-14 glass rounded-2xl p-6 grid grid-cols-3 gap-6 text-center stagger">
           {[
-            { val: '140+', label: 'Neighbourhoods' },
+            { val: '10+', label: 'Ontario Cities' },
             { val: 'AI', label: 'Powered Insights' },
-            { val: 'Live', label: 'Crime & Safety Data' },
+            { val: 'Live', label: 'Safety Data' },
           ].map((s) => (
             <div key={s.label}>
               <div className="font-display font-black text-2xl text-[var(--accent)]">{s.val}</div>
@@ -134,7 +169,7 @@ export default function Home() {
 
         {/* Footer */}
         <footer className="mt-16 text-center text-[var(--muted)] text-xs" style={{ fontFamily: 'var(--font-body)' }}>
-          <p>Powered by Google Maps + Claude AI · <a href="https://vibemap.ca" className="hover:text-[var(--accent)] transition-colors">vibemap.ca</a></p>
+          <p>Powered by Google Maps + Claude AI &middot; <a href="https://vibemap.ca" className="hover:text-[var(--accent)] transition-colors">vibemap.ca</a></p>
         </footer>
       </div>
     </main>
